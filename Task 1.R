@@ -85,14 +85,12 @@ undelivered = orders %>%
 print(undelivered %>% arrange(desc(not_delivered_pct)), n = 30)
 
 #Bar chart
-#is_not_delivered = orders$order_status != "delivered"
-#not_delivered_pct = mean(is_not_delivered) * 100
 
 
 bar_undelivered = ggplot(undelivered, aes(x = customer_state, y = not_delivered_pct)) +
   geom_col(fill = "#FF1222") +
   geom_hline(yintercept = not_delivered_total$percentage,
-             linetype = "dashed", color = "#2FEABD", linewidth = 0.9) +
+             linetype = "dashed", color = "#00F", linewidth = 0.9) +
   coord_flip()+
   labs(
     title    = "Percentage of Orders Not Delivered by Customer State",
