@@ -54,7 +54,7 @@ print(status_summary %>% arrange(desc(order_count)))
 
 not_delivered_total = orders %>%
   summarise(
-    total_orders = n(),
+    total_orders   = n(),
     not_delivered = sum(order_status != "delivered"),
     percentage   = mean(order_status != "delivered") * 100
   )
@@ -101,3 +101,21 @@ bar_undelivered = ggplot(undelivered, aes(x = customer_state, y = not_delivered_
 
 print(bar_undelivered)
 
+
+#Task 3
+
+payments = read.csv("payments.csv")
+
+payment_summary = payments %>%
+  group_by(payment_type) %>% 
+  summarise(
+    payment_count = n(),
+    pct           = n(),
+    mean_value    = mean(payment_value, na.rm = TRUE),
+    median_value  = median(payment_value, na.rm = TRUE),
+    iqr_value     = IQR(payment_value, na.rm = TRUE),
+    max_value     = max(payment_value, na.rm = TRUE),
+  ) %>% 
+  arrange(desc(payment_count))
+
+print(payment_summary)
