@@ -3,12 +3,14 @@
 library(tidyverse)
 
 
-#Calculate requested statistics of item prices
+##Calculate requested statistics of item prices
 order_items = read.csv("order_items.csv")
 products    = read.csv("products.csv")
 mean_price   = mean(order_items$price, na.rm = TRUE)
 median_price = median(order_items$price, na.rm = TRUE)
 
+
+##Plotting the distribution of item prices
 ggplot(order_items, aes(x = price)) +
   geom_histogram(binwidth = 25, fill = "blue", color = "white") +
   geom_vline(xintercept = mean_price, color = "red", linetype = "dashed", linewidth = 1) +
@@ -19,17 +21,17 @@ ggplot(order_items, aes(x = price)) +
     x = "Price",
     y = "Count")
 
-#The distribution is mostly low to mid price, with a few high value items
+###The distribution is mostly low to mid price, with a few high value items
+
 
 ##Freight Value
-
 items_products = order_items %>%
   inner_join(products, by = "product_id") %>%
   filter(!is.na(product_weight_g), !is.na(freight_value))
 
 scatterPlot = ggplot(items_products, aes(x = product_weight_g/1000, y = freight_value))+
   geom_point(color = "red", size = 1.2) +
-  geom_smooth(method = "lm", color = "green") +
+  geom_smooth(method = "lm", se = TRUE, color = "green") +
   labs(
     title = "Freight Value vs Product Weight",
     x = "Product weight(kg)",
@@ -37,9 +39,11 @@ scatterPlot = ggplot(items_products, aes(x = product_weight_g/1000, y = freight_
 
 
 print(scatterPlot)
-#Heavier items cause higher shipping charges
+###Heavier items cause higher shipping charges
 
-##Task 2
+#Task 2
+
+##Read data, make percentage of order statuses
 orders    = read_csv("orders.csv")
 customers = read_csv("customers.csv")
 
@@ -48,10 +52,14 @@ status_summary = orders %>%
   mutate(
     pct = (order_count / sum(order_count)) * 100
   )
-#Pct = percentage
+
+###Pct = percentage
 
 print(status_summary %>% arrange(desc(order_count)))
 
+
+
+##Percentage and total of not delivered
 not_delivered_total = orders %>%
   summarise(
     total_orders   = n(),
@@ -61,6 +69,8 @@ not_delivered_total = orders %>%
 
 print(not_delivered_total)
 
+
+##Barplot of statuses of orders
 bar_status = ggplot(status_summary, aes(x = order_status, y = order_count)) + 
   geom_col(aes(fill = order_status == "delivered"), show.legend = FALSE) +
   coord_flip(ylim = c(0, max(status_summary$order_count))) + 
@@ -72,7 +82,7 @@ bar_status = ggplot(status_summary, aes(x = order_status, y = order_count)) +
   )
 print(bar_status)
 
-## Join orders
+##Orders not delivered per state 
 undelivered = orders %>%
   inner_join(customers, by = "customer_id") %>%
   mutate(is_not_delivered = order_status != "delivered") %>%
@@ -84,9 +94,8 @@ undelivered = orders %>%
   )
 print(undelivered %>% arrange(desc(not_delivered_pct)), n = 30)
 
-#Bar chart
 
-
+##Bar chart of not delivered per state, along with the average
 bar_undelivered = ggplot(undelivered, aes(x = customer_state, y = not_delivered_pct)) +
   geom_col(fill = "#FF1222") +
   geom_hline(yintercept = not_delivered_total$percentage,
@@ -101,16 +110,21 @@ bar_undelivered = ggplot(undelivered, aes(x = customer_state, y = not_delivered_
 
 print(bar_undelivered)
 
+###Something might be up with SE, RO, RJ, PI, PE, PB, MA, GO, CE, BA, AL
+###Something is DEFINITELY up with RR
 
 #Task 3
 
+
+##Read file
 payments = read.csv("payments.csv")
 
+##Usage frequency of each payment type
 payment_summary = payments %>%
   group_by(payment_type) %>% 
   summarise(
     payment_count = n(),
-    pct           = n(),
+    pct           = (n() / nrow(payments)) * 100,
     mean_value    = mean(payment_value, na.rm = TRUE),
     median_value  = median(payment_value, na.rm = TRUE),
     iqr_value     = IQR(payment_value, na.rm = TRUE),
@@ -119,3 +133,36 @@ payment_summary = payments %>%
   arrange(desc(payment_count))
 
 print(payment_summary)
+
+##Bar chart of payment type
+payment_methods = payment_summary %>%
+  ggplot(aes(x = payment_type, y = payment_count)) + 
+  geom_col(fill = "#FE3F4A") +
+  coord_flip() +
+  labs(
+    title = "Payment Method Usage Frequency",
+    subtitle = "Credit cards are used most often (73.92% of all transactions)",
+    x = "Payment Type",
+    y = "Number of Payments"
+  ) 
+
+print(payment_methods)
+
+##Boxplot for payment values (log10 scale)
+###Ensure that log10 has no negatives
+valid_payments = payments %>% 
+  filter(payment_value > 0)
+
+boxplot_values = ggplot(valid_payments, aes(x = payment_type, y = payment_value,
+                                            fill = payment_type)) +
+  geom_boxplot() +
+  scale_y_log10(breaks = c(0.01, 0.1, 1, 10, 100, 1000, 10000)) +
+  labs(
+    title = "Distribution of Payment Values by Payment Method (Log10 Scale)",
+    subtitle = "Credit cards used for most expensive purchases, vouchers for cheapest",
+    x = "Payment Type",
+    y = "Payment Value (BRL, Log10 Scale)"
+  )
+
+print(boxplot_values)
+###People genuinely pay in cents using credit cards????
