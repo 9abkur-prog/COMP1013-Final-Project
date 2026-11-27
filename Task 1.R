@@ -165,4 +165,3 @@ boxplot_values = ggplot(valid_payments, aes(x = payment_type, y = payment_value,
   )
 
 print(boxplot_values)
-###People genuinely pay in cents using credit cards????
