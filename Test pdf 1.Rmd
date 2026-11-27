@@ -1,0 +1,227 @@
+---
+title: "COMP 1013 Final Project"
+author: "Gabriel Gregorius CK"
+date: "2026-11-27"
+output: pdf_document
+---
+By including this statement, I, the author of this work, verify that:
+•	I hold a copy of this assignment that I can produce if the original is lost or damaged.
+
+•	I hereby certify that no part of this assignment/product has been copied from any other student’s work or from any other source except where due acknowledgement is made in the assignment.
+
+•	No part of this assignment/product has been written/produced for me by another person except where such collaboration has been authorised by the subject lecturer/tutor concerned.
+
+•	I am aware that this work may be reproduced and submitted to plagiarism detection software programs for the purpose of detecting possible plagiarism (which may retain a copy on its database for future plagiarism checking).
+
+•	I hereby certify that I have read and understand what the School of Computing, Data Science and Mathematics defines as minor and substantial breaches of misconduct as outlined in the learning guide for this unit.
+
+
+
+
+Signature: ______________________________ Date: 27-11-2026
+
+# Task 1: Product price and shipping costs
+To analyze the product pricing and shipping behaviours, the tidyverse library was chosen for its versatility in data skimming and visualization.
+
+For the first part of the task, the histogram was limited to a maximum limit of 1000 BRL, which prevents extreme outliers from stretching the graph and optically skewing the results.
+
+For the second part of the task, an inner join is used to nullify any pieces of data that might return NA which would have caused a bias in the linear regression.
+
+
+## Task 1 Part 1: Product prices
+```{r setup, include=TRUE, warning = FALSE, message = FALSE}
+
+library(tidyverse)
+library(ggplot2)
+
+##Calculate requested statistics of item prices
+order_items = read.csv("order_items.csv")
+products    = read.csv("products.csv")
+mean_price   = mean(order_items$price, na.rm = TRUE)
+median_price = median(order_items$price, na.rm = TRUE)
+
+
+##Plotting the distribution of item prices
+ggplot(order_items, aes(x = price)) +
+  geom_histogram(binwidth = 25, fill = "blue", color = "white") +
+  geom_vline(xintercept = mean_price, color = "red", linetype = "dashed", linewidth = 1) +
+  geom_vline(xintercept = median_price, color = "darkgreen", linewidth = 1) + 
+  xlim(0, 1000) + labs(
+    title = "Distribution of Item Prices (capped at 1000 Real for clarity)",
+    subtitle = "Red dashed line = Mean | Green solid line = Median",
+    x = "Price",
+    y = "Count")
+```
+The median price is 74.99 BRL while the mean price is 120.65 BRL, indicating that while the majority of purchases are low to medium priced consumer goods, there are a handful of higher value purchases which push the mean to be over 50% larger than the median.
+
+
+
+## Task 1 Part 2: Freight value vs Product weight
+```{r}
+##Freight Value
+items_products = order_items %>%
+  inner_join(products, by = "product_id") %>%
+  filter(!is.na(product_weight_g), !is.na(freight_value))
+
+scatterPlot = ggplot(items_products, aes(x = product_weight_g/1000, y = freight_value))+
+  geom_point(color = "red", size = 1.2) +
+  geom_smooth(method = "lm", se = TRUE, color = "green") +
+  labs(
+    title = "Freight Value vs Product Weight",
+    x = "Product weight(kg)",
+    y = "Freight value(BRL)")
+
+
+print(scatterPlot)
+```
+There is a decently strong correlation between a product's weight and its freight value, as can be seen by the linear regression line above, indicating that a heavier item will incur a higher freight value. Some outliers (the 15kg item incurring a 400 BRL freight value) suggest that there are other factors that contribute to an item's freight value
+
+
+
+# Task 2: Undelivered Orders
+For the first part of the task, the order status is ordered in descending order to more easily show which status is most frequent. The code also uses order status != delivered to cover all of the non-delivered states that an order can be in
+
+For the second part of the task, the comparison of undelivered orders per state, the usage of percentage is used to adjust for difference in population and/or order volume. The inner join links orders and customers to the destination of the order.
+
+
+## Task 2 Part 1: Percentage of orders not delivered
+```{r}
+##Read data, make percentage of order statuses
+orders    = read_csv("orders.csv", show_col_types = FALSE)
+customers = read_csv("customers.csv", show_col_types = FALSE)
+
+status_summary = orders %>%
+  count(order_status, name = "order_count") %>%
+  mutate(
+    pct = (order_count / sum(order_count)) * 100
+  )
+
+###Pct = percentage
+
+print(status_summary %>% arrange(desc(order_count)))
+
+
+##Percentage and total of not delivered
+not_delivered_total = orders %>%
+  summarise(
+    total_orders   = n(),
+    not_delivered = sum(order_status != "delivered"),
+    percentage   = mean(order_status != "delivered") * 100
+  )
+
+print(not_delivered_total)
+
+
+##Barplot of statuses of orders
+bar_status = ggplot(status_summary, aes(x = order_status, y = order_count)) + 
+  geom_col(aes(fill = order_status == "delivered"), show.legend = FALSE) +
+  coord_flip(ylim = c(0, max(status_summary$order_count))) + 
+  labs(
+    title    = "Order Count and Share by Order Status",
+    subtitle = "97.02% of orders were delivered; 2.98% (2963 orders) were not delivered",
+    x        = "Order Status",
+    y        = "Number of Orders"
+  )
+print(bar_status)
+
+
+```
+Out of 99441 orders, 96478(97%) were succesfully delivered while the rest (2963 or 2.98%) were not delivered. Among the undelivered orders, the most common status is that the item was being shipped(1.11% of orders), followed by canceled orders (0.629%), and unavailable (0.612%)
+
+
+# Task 2 Part 2: Percentage of orders not delivered per state
+```{r}
+##Orders not delivered per state 
+undelivered = orders %>%
+  inner_join(customers, by = "customer_id") %>%
+  mutate(is_not_delivered = order_status != "delivered") %>%
+  group_by(customer_state) %>%
+  summarise(
+    total_orders = n(),
+    not_delivered_count = sum(is_not_delivered),
+    not_delivered_pct = mean(is_not_delivered) * 100
+  )
+print(undelivered %>% arrange(desc(not_delivered_pct)), n = 30)
+
+
+##Bar chart of not delivered per state, along with the average
+bar_undelivered = ggplot(undelivered, aes(x = customer_state, y = not_delivered_pct)) +
+  geom_col(fill = "#FF1222") +
+  geom_hline(yintercept = not_delivered_total$percentage,
+             linetype = "dashed", color = "#00F", linewidth = 0.9) +
+  coord_flip()+
+  labs(
+    title    = "Percentage of Orders Not Delivered by Customer State",
+    subtitle = "Dashed line shows overall national non-delivery rate (2.98%)",
+    x        = "Customer State",
+    y        = "Not Delivered (%)"
+  )
+
+print(bar_undelivered)
+```
+
+Some states seem to exceed the national mean, it can be observed that the northern regions have a higher rate of undelivered orders, with RR in the North being the worst, having 3 times the national average. Meanwhile the states in the southern regions tend to have lower than average rates of undelivered orders. RR's high rate of undelivered orders might also be caused by its small amount of orders (46).
+
+# Task 3: Payment Methods
+For the first part of this task, grouping payments by payment type allow for simultaneous calculation of transaction counts and its respective percentage shares.
+ 
+For the second part of the task, since payment amounts can vary from 0.01 BRL to over 10000, a log10 scale is used for the second part of this task
+
+
+## Task 3 Part 1: Frequency of each payment type
+```{r}
+##Read file
+payments = read.csv("payments.csv")
+
+##Usage frequency of each payment type
+payment_summary = payments %>%
+  group_by(payment_type) %>% 
+  summarise(
+    payment_count = n(),
+    pct           = (n() / nrow(payments)) * 100,
+    mean_value    = mean(payment_value, na.rm = TRUE),
+    median_value  = median(payment_value, na.rm = TRUE),
+    iqr_value     = IQR(payment_value, na.rm = TRUE),
+    max_value     = max(payment_value, na.rm = TRUE),
+  ) %>% 
+  arrange(desc(payment_count))
+
+print(payment_summary)
+
+##Bar chart of payment type
+payment_methods = payment_summary %>%
+  ggplot(aes(x = payment_type, y = payment_count)) + 
+  geom_col(fill = "#FE3F4A") +
+  coord_flip() +
+  labs(
+    title = "Payment Method Usage Frequency",
+    subtitle = "Credit cards are used most often (73.92% of all transactions)",
+    x = "Payment Type",
+    y = "Number of Payments"
+  ) 
+
+print(payment_methods)
+```
+Customers overwhelmingly prefer using credit cards, accounting for 76795 (73.9%) transactions. Boleto is secoond at 19784(19%), followed by vouchers (5.56%) and debit cards (1.47%). With 3(0.003%) transactions being not defined
+
+```{r}
+##Boxplot for payment values (log10 scale)
+##Ensure that log10 has no negatives
+valid_payments = payments %>% 
+  filter(payment_value > 0)
+
+boxplot_values = ggplot(valid_payments, aes(x = payment_type, y = payment_value,
+                                            fill = payment_type)) +
+  geom_boxplot() +
+  scale_y_log10(breaks = c(0.01, 0.1, 1, 10, 100, 1000, 10000)) +
+  labs(
+    title = "Distribution of Payment Values by Payment Method (Log10 Scale)",
+    subtitle = "Credit cards used for most expensive purchases, vouchers for cheapest",
+    x = "Payment Type",
+    y = "Payment Value (BRL, Log10 Scale)"
+  )
+
+print(boxplot_values)
+```
+Customers tend to use credit cards for higher value purchases, followed by Boleto and debit cards, which have more or less the same amount, while vouchers have the lowest median. 
+
